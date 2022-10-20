@@ -34,6 +34,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	err = doc.CopyPicture(1, `{"x_scale": 1.0, "y_scale": 1.0}`, "D1")
+	if err != nil {
+		panic(err)
+	}
 	err = doc.Save("./report.xlsx")
 	if err != nil {
 		panic(err)

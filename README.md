@@ -76,6 +76,7 @@ Error processing omited in example.
     doc := xlst.New()
 	doc.ReadTemplate("./template.xlsx")
 	doc.Render(ctx)
+	//doc.CopyPicture(1, `{"x_scale": 1.0, "y_scale": 1.0}`, "D1")
 	doc.Save("./report.xlsx")
 ```
 
@@ -129,3 +130,17 @@ Save() saves generated report to disk
 func (m *Xlst) Write(writer io.Writer) error
 ```
 Write() writes generated report to provided writer
+
+#### func (m *Xlst) CopyPicture
+
+```go
+func (m *Xlst) CopyPicture(sheetIndex int, format, cell string) error
+```
+CopyPicture() copy one picture from template to report
+
+#### func (m *Xlst) CopyPictures
+
+```go
+func (m *Xlst) CopyPictures(sheetIndex int, format string, cells ...string) error
+```
+CopyPictures() copy many pictures from template to report

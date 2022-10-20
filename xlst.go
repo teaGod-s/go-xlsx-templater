@@ -1,13 +1,19 @@
 package xlst
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
+	"path"
 	"reflect"
 	"regexp"
 	"strings"
 
+	"github.com/360EntSecGroup-Skylar/excelize"
 	"github.com/aymerick/raymond"
 	"github.com/tealeg/xlsx"
 )
@@ -20,8 +26,9 @@ var (
 
 // Xlst Represents template struct
 type Xlst struct {
-	file   *xlsx.File
-	report *xlsx.File
+	file         *xlsx.File
+	report       *excelize.File
+	templatePath string
 }
 
 // Options for render has only one property WrapTextInAllCells for wrapping text
@@ -70,7 +77,15 @@ func (m *Xlst) RenderWithOptions(in interface{}, options *Options) error {
 			report.Sheets[si].Cols = append(report.Sheets[si].Cols, col)
 		}
 	}
-	m.report = report
+	reportBuffer := &bytes.Buffer{}
+	if err := report.Write(reportBuffer); err != nil {
+		return err
+	}
+	reportExcelize, err := excelize.OpenReader(reportBuffer)
+	if err != nil {
+		return err
+	}
+	m.report = reportExcelize
 
 	return nil
 }
@@ -82,6 +97,7 @@ func (m *Xlst) ReadTemplate(path string) error {
 		return err
 	}
 	m.file = file
+	m.templatePath = path
 	return nil
 }
 
@@ -90,7 +106,7 @@ func (m *Xlst) Save(path string) error {
 	if m.report == nil {
 		return errors.New("Report was not generated")
 	}
-	return m.report.Save(path)
+	return m.report.SaveAs(path)
 }
 
 // Write writes generated report to provided writer
@@ -99,6 +115,38 @@ func (m *Xlst) Write(writer io.Writer) error {
 		return errors.New("Report was not generated")
 	}
 	return m.report.Write(writer)
+}
+
+func (m *Xlst) CopyPictures(sheetIndex int, format string, cells ...string) error {
+	for _, cell := range cells {
+		if err := m.CopyPicture(sheetIndex, format, cell); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CopyPicture 拷贝模板中指定sheet的指定单元格位置的图片
+func (m *Xlst) CopyPicture(sheetIndex int, format, cell string) error {
+	if m.report == nil {
+		return errors.New("Report was not generated")
+	}
+
+	fileXlsx, err := excelize.OpenFile(m.templatePath)
+	if err != nil {
+		return err
+	}
+	pictureFile, raw := fileXlsx.GetPicture(fileXlsx.GetSheetName(sheetIndex), cell)
+	if pictureFile == "" || len(raw) == 0 {
+		return errors.New("Picture not fount in " + cell)
+	}
+	picExtension := path.Ext(pictureFile)
+
+	err = m.report.AddPictureFromBytes(m.report.GetSheetName(sheetIndex), cell, format, getPureFileName(pictureFile), picExtension, raw)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func renderRows(sheet *xlsx.Sheet, rows []*xlsx.Row, ctx map[string]interface{}, options *Options) error {
@@ -335,4 +383,8 @@ func renderRow(in *xlsx.Row, ctx interface{}) error {
 		}
 	}
 	return nil
+}
+
+func getPureFileName(fileName string) string {
+	return strings.Split(fileName, ".")[0]
 }
